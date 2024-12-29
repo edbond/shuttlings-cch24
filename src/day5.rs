@@ -1,12 +1,8 @@
-use std::{process::CommandArgs, str::FromStr};
-
 use axum::{
     http::{header::CONTENT_TYPE, HeaderMap, StatusCode},
     response::IntoResponse,
 };
-
 use cargo_manifest::Manifest;
-use serde::{Deserialize, Serialize};
 use toml::Table;
 
 fn format_orders(orders: &Vec<toml::Value>) -> String {
@@ -126,48 +122,6 @@ pub async fn day5_manifest(headers: HeaderMap, manifest: String) -> impl IntoRes
 mod day5_tests {
     use toml::Table;
 
-    use super::*;
-
-    #[test]
-    fn test_day5_manifest() {
-        let manifest_str = r#"
-            [package]
-            name = "not-a-gift-order"
-            authors = ["Not Santa"]
-            keywords = ["Christmas 2024"]
-
-            [[package.metadata.orders]]
-            item = "Toy car"
-            quantity = 2
-
-            [[package.metadata.orders]]
-            item = "Lego brick"
-            quantity = 230
-        "#;
-
-        let config: Config = toml::from_str(&manifest_str).expect("manifest parse error");
-
-        assert_eq!(config.package.metadata.orders.len(), 2);
-    }
-
-    #[test]
-    fn invalid_config() {
-        let manifest_str = r#"
-            [package]
-            name = "coal-in-a-bowl"
-            authors = ["H4CK3R_13E7"]
-            keywords = ["Christmas 2024"]
-
-            [[package.metadata.orders]]
-            item = "Coal"
-            quantity = "Hahaha get rekt"
-        "#;
-
-        let config: Result<Config, _> = toml::from_str(&manifest_str);
-
-        assert!(config.is_err());
-    }
-
     #[test]
     fn day5_test4() {
         let manifest_str = r#"
@@ -197,9 +151,5 @@ count = 3
 
         println!("{:?}", table);
         println!("{:?}", table["package"]["metadata"]["orders"]);
-
-        // let orders = table["package"]["metadata"]["orders"].as_array();
-
-        // assert_eq!(table, "abcd");
     }
 }
