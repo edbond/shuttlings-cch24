@@ -19,6 +19,7 @@ use day12::*;
 use day2::*;
 use day5::*;
 use day9::*;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 async fn hello_world() -> &'static str {
     "Hello, bird!"
@@ -35,7 +36,7 @@ async fn fallback() -> impl IntoResponse {
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Item {
     Empty,
     Cookie,
@@ -52,6 +53,7 @@ struct Pos {
 #[derive(Debug)]
 struct Game {
     board: HashMap<Pos, Item>,
+    rng: StdRng,
 }
 
 impl Game {
@@ -68,6 +70,97 @@ impl Game {
         for x in 1..=4 {
             for y in 0..=3 {
                 self.board.insert(Pos { x, y }, Item::Empty);
+            }
+        }
+
+        self.rng = rand::rngs::StdRng::seed_from_u64(2024);
+    }
+
+    fn place(&mut self, team: &str, column: u32) -> Result<(), &str> {
+        if !(1..=4).contains(&column) {
+            return Err("Invalid column");
+        }
+
+        if self.board.get(&Pos { x: column, y: 0 }).unwrap() != &Item::Empty {
+            return Err("Column is full");
+        }
+
+        let team = match team {
+            "cookie" => Item::Cookie,
+            "milk" => Item::Milk,
+            _ => return Err("Invalid team"),
+        };
+
+        for y in (0..=3).rev() {
+            if self.board.get(&Pos { x: column, y }).unwrap() == &Item::Empty {
+                self.board.insert(Pos { x: column, y }, team);
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
+
+    fn is_winner(&self) -> Option<Item> {
+        // check rows
+        for y in 0..=3 {
+            let row = (1..=4).map(|x| self.board.get(&Pos { x, y }).unwrap());
+            let row_items: Vec<&Item> = row.collect();
+            let first = row_items[0];
+
+            if *first != Item::Empty && row_items.iter().all(|item| *item == first) {
+                return Some(*first);
+            }
+        }
+
+        // check columns
+        for x in 1..=4 {
+            let column = (0..=3).map(|y| self.board.get(&Pos { x, y }).unwrap());
+            let items: Vec<&Item> = column.collect();
+            let first = items[0];
+
+            if *first != Item::Empty && items.iter().all(|item| *item == first) {
+                return Some(*first);
+            }
+        }
+
+        // check diagonals
+        let diagonal1 = (1..=4).map(|x| self.board.get(&Pos { x, y: x - 1 }).unwrap());
+        let items: Vec<&Item> = diagonal1.collect();
+        let first = items[0];
+        if *first != Item::Empty && items.iter().all(|item| *item == first) {
+            return Some(*first);
+        }
+
+        // x = 1, y = 3
+        // x = 2, y = 2
+        let diagonal2 = (1..=4).map(|x| self.board.get(&Pos { x, y: 4 - x }).unwrap());
+        let items: Vec<&Item> = diagonal2.collect();
+        let first = items[0];
+        if *first != Item::Empty && items.iter().all(|item| *item == first) {
+            return Some(*first);
+        }
+
+        None
+    }
+
+    fn is_full(&self) -> bool {
+        for y in 0..=3 {
+            for x in 1..=4 {
+                if self.board.get(&Pos { x, y }).unwrap() == &Item::Empty {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn make_rand(&mut self) {
+        for y in 0..=3 {
+            for x in 1..=4 {
+                let cookie = self.rng.gen::<bool>();
+                let item = if cookie { Item::Cookie } else { Item::Milk };
+
+                self.board.insert(Pos { x, y }, item);
             }
         }
     }
@@ -103,6 +196,7 @@ struct AppState {
 async fn main() -> shuttle_axum::ShuttleAxum {
     let mut game = Game {
         board: HashMap::new(),
+        rng: rand::rngs::StdRng::seed_from_u64(2024),
     };
     game.reset();
 
@@ -136,6 +230,8 @@ async fn main() -> shuttle_axum::ShuttleAxum {
         .route("/9/refill", post(refill))
         .route("/12/board", get(board))
         .route("/12/reset", post(reset))
+        .route("/12/place/:team/:column", post(place))
+        .route("/12/random-board", get(random_board))
         .with_state(shared_state.clone())
         .fallback(fallback);
 
